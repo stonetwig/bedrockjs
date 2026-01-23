@@ -1,4 +1,4 @@
-[BedrockJS](bedrockjs.png)
+![BedrockJS](bedrockjs.png)
 
 A lightweight web framework built on Web Components with lit-html-style templating, reactive state management, and a router with async data fetching.
 
