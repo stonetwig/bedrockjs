@@ -1,5 +1,5 @@
 {
-  "name": "bedrockjs",
+  "name": "@devera/bedrockjs",
   "version": "0.1.0",
   "description": "A lightweight web framework built on web components",
   "type": "module",
