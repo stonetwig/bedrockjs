@@ -1,0 +1,13 @@
+{
+  "name": "@devera/bedrockjs",
+  "version": "0.1.0",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.js",
+    "./html": "./src/html.js",
+    "./render": "./src/render.js",
+    "./component": "./src/component.js",
+    "./reactive": "./src/reactive.js",
+    "./router": "./src/router.js"
+  }
+}

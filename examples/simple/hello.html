@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hello World - BedrockJS</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+    hello-world {
+      display: block;
+      padding: 1rem;
+      background: #f0f8ff;
+      border-radius: 8px;
+      margin: 1rem 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Hello World Example</h1>
+
+  <hello-world name="BedrockJS"></hello-world>
+  <hello-world></hello-world>
+
+  <script type="module">
+    import { html, Component } from '../../src/index.js';
+
+    class HelloWorld extends Component {
+      static tag = 'hello-world';
+      static properties = {
+        name: { type: String, default: 'World' }
+      };
+
+      render() {
+        return html`
+          <div>
+            <h2>Hello, ${this.name}!</h2>
+            <p>Welcome to BedrockJS - a lightweight web framework.</p>
+          </div>
+        `;
+      }
+    }
+
+    // Register the component
+    HelloWorld.register();
+  </script>
+</body>
+</html>

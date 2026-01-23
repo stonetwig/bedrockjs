@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>List Rendering - BedrockJS</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+    todo-list {
+      display: block;
+      padding: 1rem;
+      background: #fff9e6;
+      border-radius: 8px;
+      margin: 1rem 0;
+    }
+    todo-list ul {
+      list-style: none;
+      padding: 0;
+    }
+    todo-list li {
+      padding: 0.5rem;
+      margin: 0.25rem 0;
+      background: white;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    todo-list input[type="text"] {
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-right: 0.5rem;
+    }
+    todo-list button {
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>List Rendering Example</h1>
+  <p>Demonstrates rendering arrays and handling list updates.</p>
+
+  <todo-list></todo-list>
+
+  <script type="module">
+    import { html, Component, keyed } from '../../src/index.js';
+
+    class TodoList extends Component {
+      static tag = 'todo-list';
+      static properties = {
+        items: { type: Array, default: () => [
+          { id: 1, text: 'Learn BedrockJS', done: false },
+          { id: 2, text: 'Build something cool', done: false },
+          { id: 3, text: 'Share with others', done: false }
+        ]},
+        newItemText: { type: String, default: '' }
+      };
+
+      #nextId = 4;
+
+      handleInput = (e) => {
+        this.newItemText = e.target.value;
+      };
+
+      addItem = () => {
+        if (this.newItemText.trim()) {
+          this.items = [...this.items, {
+            id: this.#nextId++,
+            text: this.newItemText.trim(),
+            done: false
+          }];
+          this.newItemText = '';
+        }
+      };
+
+      handleKeyPress = (e) => {
+        if (e.key === 'Enter') {
+          this.addItem();
+        }
+      };
+
+      toggleItem = (id) => {
+        this.items = this.items.map(item =>
+          item.id === id ? { ...item, done: !item.done } : item
+        );
+      };
+
+      removeItem = (id) => {
+        this.items = this.items.filter(item => item.id !== id);
+      };
+
+      render() {
+        return html`
+          <div>
+            <h2>Todo List</h2>
+            <div style="margin-bottom: 1rem;">
+              <input
+                type="text"
+                placeholder="Add new item..."
+                .value=${this.newItemText}
+                on-input=${this.handleInput}
+                on-keypress=${this.handleKeyPress}
+              >
+              <button on-click=${this.addItem}>Add</button>
+            </div>
+            <ul>
+              ${this.items.map(item => keyed(item.id, html`
+                <li>
+                  <span
+                    style="cursor: pointer; ${item.done ? 'text-decoration: line-through; color: #999;' : ''}"
+                    on-click=${() => this.toggleItem(item.id)}
+                  >
+                    ${item.text}
+                  </span>
+                  <button on-click=${() => this.removeItem(item.id)}>X</button>
+                </li>
+              `))}
+            </ul>
+            <p style="color: #666; font-size: 0.9em;">
+              ${this.items.filter(i => !i.done).length} items remaining
+            </p>
+          </div>
+        `;
+      }
+    }
+
+    TodoList.register();
+  </script>
+</body>
+</html>

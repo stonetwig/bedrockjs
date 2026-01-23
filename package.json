@@ -1,0 +1,31 @@
+{
+  "name": "bedrockjs",
+  "version": "0.1.0",
+  "description": "A lightweight web framework built on web components",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./html": "./src/html.js",
+    "./render": "./src/render.js",
+    "./component": "./src/component.js",
+    "./reactive": "./src/reactive.js",
+    "./router": "./src/router.js"
+  },
+  "scripts": {
+    "dev": "serve -p 3000 .",
+    "start": "serve -p 3000 .",
+    "examples": "serve -p 3000 . -o /examples"
+  },
+  "devDependencies": {
+    "serve": "^14.2.0"
+  },
+  "keywords": [
+    "web-components",
+    "framework",
+    "reactive",
+    "router",
+    "template"
+  ],
+  "license": "MIT"
+}

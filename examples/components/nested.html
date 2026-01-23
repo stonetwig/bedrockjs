@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nested Components - BedrockJS</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+    user-profile {
+      display: block;
+      padding: 1rem;
+      background: #f0fff0;
+      border-radius: 8px;
+      margin: 1rem 0;
+    }
+    user-avatar {
+      display: inline-block;
+      margin-right: 1rem;
+    }
+    user-stats {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    stat-item {
+      display: block;
+      padding: 0.5rem 1rem;
+      background: white;
+      border-radius: 4px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>Nested Components Example</h1>
+  <p>Demonstrates component composition with parent-child relationships.</p>
+
+  <user-profile
+    name="John Doe"
+    email="john@example.com"
+    avatar-url="https://i.pravatar.cc/80?u=john"
+  ></user-profile>
+
+  <user-profile
+    name="Jane Smith"
+    email="jane@example.com"
+    avatar-url="https://i.pravatar.cc/80?u=jane"
+  ></user-profile>
+
+  <script type="module">
+    import { html, Component } from '../../src/index.js';
+
+    // Stat item component
+    class StatItem extends Component {
+      static tag = 'stat-item';
+      static properties = {
+        label: { type: String },
+        value: { type: Number, default: 0 }
+      };
+
+      render() {
+        return html`
+          <div>
+            <div style="font-size: 1.5em; font-weight: bold;">${this.value}</div>
+            <div style="font-size: 0.8em; color: #666;">${this.label}</div>
+          </div>
+        `;
+      }
+    }
+    StatItem.register();
+
+    // User stats component (contains stat items)
+    class UserStats extends Component {
+      static tag = 'user-stats';
+      static properties = {
+        posts: { type: Number, default: 0 },
+        followers: { type: Number, default: 0 },
+        following: { type: Number, default: 0 }
+      };
+
+      render() {
+        return html`
+          <stat-item label="Posts" value="${this.posts}"></stat-item>
+          <stat-item label="Followers" value="${this.followers}"></stat-item>
+          <stat-item label="Following" value="${this.following}"></stat-item>
+        `;
+      }
+    }
+    UserStats.register();
+
+    // User avatar component
+    class UserAvatar extends Component {
+      static tag = 'user-avatar';
+      static properties = {
+        src: { type: String },
+        size: { type: Number, default: 60 }
+      };
+
+      render() {
+        return html`
+          <img
+            src="${this.src || 'https://via.placeholder.com/60'}"
+            alt="Avatar"
+            style="width: ${this.size}px; height: ${this.size}px; border-radius: 50%; object-fit: cover;"
+          >
+        `;
+      }
+    }
+    UserAvatar.register();
+
+    // Main user profile component
+    class UserProfile extends Component {
+      static tag = 'user-profile';
+      static properties = {
+        name: { type: String, default: 'Anonymous' },
+        email: { type: String },
+        avatarUrl: { type: String }
+      };
+
+      // Simulated data - in a real app this would come from an API
+      posts = Math.floor(Math.random() * 100);
+      followers = Math.floor(Math.random() * 1000);
+      following = Math.floor(Math.random() * 500);
+
+      render() {
+        return html`
+          <div style="display: flex; align-items: center;">
+            <user-avatar src="${this.avatarUrl}" size="80"></user-avatar>
+            <div>
+              <h3 style="margin: 0;">${this.name}</h3>
+              <p style="margin: 0.25rem 0; color: #666;">${this.email}</p>
+            </div>
+          </div>
+          <user-stats
+            posts="${this.posts}"
+            followers="${this.followers}"
+            following="${this.following}"
+          ></user-stats>
+        `;
+      }
+    }
+    UserProfile.register();
+  </script>
+</body>
+</html>

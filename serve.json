@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/examples/routing/**", "destination": "/examples/routing/index.html" }
+  ]
+}

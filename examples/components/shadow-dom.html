@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shadow DOM - BedrockJS</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+    .container {
+      margin: 1rem 0;
+      padding: 1rem;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    /* These styles will NOT affect shadow DOM components */
+    h2 {
+      color: red;
+    }
+    button {
+      background: purple;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>Shadow DOM Example</h1>
+  <p>This page has global styles that make h2 red and buttons purple.</p>
+
+  <div class="container">
+    <h2>Regular h2 (affected by global styles - red)</h2>
+    <button>Regular button (affected - purple)</button>
+  </div>
+
+  <div class="container">
+    <h3>Light DOM Component (affected by global styles):</h3>
+    <light-card title="Light DOM Card">
+      <p>This card's styles are affected by global CSS.</p>
+    </light-card>
+  </div>
+
+  <div class="container">
+    <h3>Shadow DOM Component (encapsulated styles):</h3>
+    <shadow-card title="Shadow DOM Card">
+      <p>This card's internal styles are protected from global CSS.</p>
+    </shadow-card>
+  </div>
+
+  <script type="module">
+    import { html, Component } from '../../src/index.js';
+
+    // Light DOM component - styles leak in and out
+    class LightCard extends Component {
+      static tag = 'light-card';
+      static shadow = false; // default, explicitly shown
+      static properties = {
+        title: { type: String, default: 'Card Title' }
+      };
+
+      render() {
+        return html`
+          <div style="padding: 1rem; background: #fff3e0; border-radius: 8px;">
+            <h2>${this.title}</h2>
+            <slot></slot>
+            <button on-click=${() => alert('Light DOM click!')}>
+              Click me
+            </button>
+          </div>
+        `;
+      }
+    }
+    LightCard.register();
+
+    // Shadow DOM component - styles are encapsulated
+    class ShadowCard extends Component {
+      static tag = 'shadow-card';
+      static shadow = true; // Enable shadow DOM
+      static properties = {
+        title: { type: String, default: 'Card Title' }
+      };
+
+      render() {
+        return html`
+          <style>
+            :host {
+              display: block;
+            }
+            .card {
+              padding: 1rem;
+              background: #e3f2fd;
+              border-radius: 8px;
+            }
+            h2 {
+              color: #1976d2;
+              margin-top: 0;
+            }
+            button {
+              background: #1976d2;
+              color: white;
+              border: none;
+              padding: 0.5rem 1rem;
+              border-radius: 4px;
+              cursor: pointer;
+            }
+            button:hover {
+              background: #1565c0;
+            }
+          </style>
+          <div class="card">
+            <h2>${this.title}</h2>
+            <slot></slot>
+            <button on-click=${() => alert('Shadow DOM click!')}>
+              Click me (blue, not purple!)
+            </button>
+          </div>
+        `;
+      }
+    }
+    ShadowCard.register();
+  </script>
+</body>
+</html>
