@@ -1,6 +1,17 @@
 {
+  "name": "bedrockjs",
+  "version": "0.1.0",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.js",
+    "./html": "./src/html.js",
+    "./render": "./src/render.js",
+    "./component": "./src/component.js",
+    "./reactive": "./src/reactive.js",
+    "./router": "./src/router.js"
+  },
   "tasks": {
-    "dev": "deno run --allow-net --allow-read --no-check https://deno.land/std@0.201.0/http/file_server.ts --port 3000 examples",
-    "dev:open": "sh -c \"deno run --allow-net --allow-read --no-check https://deno.land/std@0.201.0/http/file_server.ts --port 3000 examples & sleep 0.5; (xdg-open http://localhost:3000 || open http://localhost:3000)\""
+    "dev": "deno run --allow-net --allow-read --no-check https://deno.land/std@0.201.0/http/file_server.ts --port 3000 .",
+    "dev:open": "sh -c \"deno run --allow-net --allow-read --no-check https://deno.land/std@0.201.0/http/file_server.ts --port 3000 . & sleep 0.5; (xdg-open http://localhost:3000/examples || open http://localhost:3000/examples)\""
   }
 }
