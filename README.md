@@ -14,8 +14,40 @@ A lightweight web framework built on Web Components with lit-html-style templati
 
 ## Installation
 
+JSR (Deno or `jsr:` import):
+
 ```bash
-npm install bedrockjs
+deno add jsr:@devera/bedrockjs
+```
+
+NPM (via JSR CLI):
+
+```bash
+npx jsr add @devera/bedrockjs
+```
+
+NPM (via JSR package):
+
+```bash
+npm install @jsr/devera__bedrockjs
+```
+
+PNPM:
+
+```bash
+pnpm add jsr:@devera/bedrockjs
+```
+
+Yarn:
+
+```bash
+yarn add jsr:@devera/bedrockjs
+```
+
+VLT:
+
+```bash
+vlt add jsr:@devera/bedrockjs
 ```
 
 Or include directly in your HTML:
@@ -31,7 +63,7 @@ Or include directly in your HTML:
 ### Hello World
 
 ```javascript
-import { html, Component } from 'bedrockjs';
+import { html, Component } from '@devera/bedrockjs';
 
 class HelloWorld extends Component {
   static tag = 'hello-world';
@@ -54,7 +86,7 @@ HelloWorld.register();
 ### Counter with Events
 
 ```javascript
-import { html, Component } from 'bedrockjs';
+import { html, Component } from '@devera/bedrockjs';
 
 class MyCounter extends Component {
   static tag = 'my-counter';
@@ -83,7 +115,7 @@ MyCounter.register();
 BedrockJS uses tagged template literals for declarative UI:
 
 ```javascript
-import { html } from 'bedrockjs';
+import { html } from '@devera/bedrockjs';
 
 const template = html`
   <div class=${className}>
