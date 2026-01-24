@@ -1,17 +1,40 @@
 {
-  "name": "@devera/bedrockjs",
+  "name": "@devera_se/bedrockjs",
   "version": "0.1.1",
   "description": "A lightweight web framework built on web components",
   "type": "module",
   "main": "src/index.js",
+  "types": "src/index.d.ts",
   "exports": {
-    ".": "./src/index.js",
-    "./html": "./src/html.js",
-    "./render": "./src/render.js",
-    "./component": "./src/component.js",
-    "./reactive": "./src/reactive.js",
-    "./router": "./src/router.js"
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./html": {
+      "types": "./src/html.d.ts",
+      "default": "./src/html.js"
+    },
+    "./render": {
+      "types": "./src/render.d.ts",
+      "default": "./src/render.js"
+    },
+    "./component": {
+      "types": "./src/component.d.ts",
+      "default": "./src/component.js"
+    },
+    "./reactive": {
+      "types": "./src/reactive.d.ts",
+      "default": "./src/reactive.js"
+    },
+    "./router": {
+      "types": "./src/router.d.ts",
+      "default": "./src/router.js"
+    }
   },
+  "files": [
+    "src"
+  ],
+  "sideEffects": false,
   "scripts": {
     "dev": "serve -p 3000 .",
     "start": "serve -p 3000 .",
@@ -20,12 +43,23 @@
   "devDependencies": {
     "serve": "^14.2.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stonetwig/bedrockjs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stonetwig/bedrockjs/issues"
+  },
+  "homepage": "https://github.com/stonetwig/bedrockjs#readme",
   "keywords": [
     "web-components",
     "framework",
     "reactive",
     "router",
-    "template"
+    "template",
+    "lit",
+    "custom-elements",
+    "signals"
   ],
   "license": "MIT"
 }
