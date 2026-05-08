@@ -17,37 +17,37 @@ A lightweight web framework built on Web Components with lit-html-style templati
 JSR (Deno or `jsr:` import):
 
 ```bash
-deno add jsr:@devera/bedrockjs
+deno add jsr:@rendly/bedrockjs
 ```
 
 NPM (via JSR CLI):
 
 ```bash
-npx jsr add @devera/bedrockjs
+npx jsr add @rendly/bedrockjs
 ```
 
 NPM (via JSR package):
 
 ```bash
-npm install @jsr/devera__bedrockjs
+npm install @jsr/rendly__bedrockjs
 ```
 
 PNPM:
 
 ```bash
-pnpm add jsr:@devera/bedrockjs
+pnpm add jsr:@rendly/bedrockjs
 ```
 
 Yarn:
 
 ```bash
-yarn add jsr:@devera/bedrockjs
+yarn add jsr:@rendly/bedrockjs
 ```
 
 VLT:
 
 ```bash
-vlt add jsr:@devera/bedrockjs
+vlt add jsr:@rendly/bedrockjs
 ```
 
 Or include directly in your HTML:
@@ -63,7 +63,7 @@ Or include directly in your HTML:
 ### Hello World
 
 ```javascript
-import { html, Component } from '@devera/bedrockjs';
+import { html, Component } from '@rendly/bedrockjs';
 
 class HelloWorld extends Component {
   static tag = 'hello-world';
@@ -86,7 +86,7 @@ HelloWorld.register();
 ### Counter with Events
 
 ```javascript
-import { html, Component } from '@devera/bedrockjs';
+import { html, Component } from '@rendly/bedrockjs';
 
 class MyCounter extends Component {
   static tag = 'my-counter';
@@ -115,7 +115,7 @@ MyCounter.register();
 BedrockJS uses tagged template literals for declarative UI:
 
 ```javascript
-import { html } from '@devera/bedrockjs';
+import { html } from '@rendly/bedrockjs';
 
 const template = html`
   <div class=${className}>
