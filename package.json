@@ -29,6 +29,10 @@
     "./router": {
       "types": "./src/router.d.ts",
       "default": "./src/router.js"
+    },
+    "./sync": {
+      "types": "./src/sync/index.d.ts",
+      "default": "./src/sync/index.js"
     }
   },
   "files": [

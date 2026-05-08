@@ -8,6 +8,8 @@
     "./render": "./src/render.js",
     "./component": "./src/component.js",
     "./reactive": "./src/reactive.js",
-    "./router": "./src/router.js"
+    "./router": "./src/router.js",
+    "./sync": "./src/sync/index.js",
+    "./sync/server": "./src/sync/server-entry.ts"
   }
 }

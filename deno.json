@@ -8,10 +8,14 @@
     "./render": "./src/render.js",
     "./component": "./src/component.js",
     "./reactive": "./src/reactive.js",
-    "./router": "./src/router.js"
+    "./router": "./src/router.js",
+    "./sync": "./src/sync/index.js",
+    "./sync/server": "./src/sync/server-entry.ts"
   },
   "tasks": {
     "dev": "deno run --allow-net --allow-read --no-check https://deno.land/std@0.201.0/http/file_server.ts --port 3000 .",
-    "dev:open": "sh -c \"deno run --allow-net --allow-read --no-check https://deno.land/std@0.201.0/http/file_server.ts --port 3000 . & sleep 0.5; (xdg-open http://localhost:3000/examples || open http://localhost:3000/examples)\""
+    "dev:open": "sh -c \"deno run --allow-net --allow-read --no-check https://deno.land/std@0.201.0/http/file_server.ts --port 3000 . & sleep 0.5; (xdg-open http://localhost:3000/examples || open http://localhost:3000/examples)\"",
+    "sync:dev": "deno run --unstable-kv --allow-net --allow-read --allow-env examples/sync/server.ts",
+    "test": "deno test --allow-read --allow-write --allow-env --allow-net --allow-ffi --unstable-kv src/sync/__tests__/"
   }
 }
