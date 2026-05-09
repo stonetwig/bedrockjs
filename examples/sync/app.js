@@ -1,5 +1,10 @@
 import { Component, html, keyed } from '../../src/index.js';
-import { syncedModel } from '../../src/sync/index.js';
+import { syncedModel, configureSync } from '../../src/sync/index.js';
+
+configureSync({
+  baseUrl: '/sync',
+  dbName: 'bedrockjs-sync-todo',
+});
 
 const Todo = syncedModel('todo', {
   fields: {

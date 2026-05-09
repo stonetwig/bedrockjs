@@ -52,13 +52,18 @@ export function defineSyncedModel(name, schema, ctx) {
     const view = publicView(row);
     const existing = byId.get(row.id);
     if (existing) {
-      // Mutate in place so reactive watchers fire on each property.
-      const idx = collection.findIndex((r) => r.id === row.id);
-      if (idx >= 0) {
-        // Replace the entire item to update reactive proxy children.
-        collection[idx] = view;
+      // Mutate properties in place so reactive watchers fire on each property.
+      for (const key of Object.keys(view)) {
+        if (existing[key] !== view[key]) {
+          existing[key] = view[key];
+        }
       }
-      byId.set(row.id, collection[idx >= 0 ? idx : collection.length - 1]);
+      // Remove keys no longer present
+      for (const key of Object.keys(existing)) {
+        if (!(key in view)) {
+          delete existing[key];
+        }
+      }
     } else {
       collection.push(view);
       byId.set(row.id, collection[collection.length - 1]);
@@ -162,7 +167,12 @@ export function defineSyncedModel(name, schema, ctx) {
   }
 
   function get(id) {
-    return byId.get(id);
+    const item = byId.get(id);
+    if (item) return item;
+    // Ensure renders that call get() while the row does not exist yet still
+    // subscribe to collection growth (e.g. first server/IDB hydration insert).
+    void collection.length;
+    return undefined;
   }
 
   function all() {

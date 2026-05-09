@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>bedrockjs sync — todo demo</title>
+    <style>
+      body { font: 14px system-ui; max-width: 540px; margin: 2rem auto; }
+      ul { list-style: none; padding: 0; }
+      li { display: flex; gap: .5rem; align-items: center; padding: .25rem 0; }
+      li.done span { text-decoration: line-through; opacity: .5; }
+      input[type="text"] { flex: 1; padding: .35rem .5rem; }
+      button { padding: .25rem .5rem; }
+      .hint { color: #666; font-size: 12px; }
+      .back-link {
+        color: #007acc;
+        text-decoration: none;
+        font-size: 12px;
+        margin-bottom: 1rem;
+        display: block;
+      }
+      .back-link:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <a href="./index.html" class="back-link">← Back to examples</a>
+    <h1>todo (synced)</h1>
+    <p class="hint">
+      Open this page in two tabs and watch them stay in sync. Toggle
+      DevTools &rarr; Network &rarr; Offline; mutations queue locally and
+      drain when you go back online.
+    </p>
+    <todo-app></todo-app>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

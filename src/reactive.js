@@ -55,6 +55,8 @@ export function reactive(target) {
     },
 
     set(obj, prop, value) {
+      const isArray = Array.isArray(obj);
+      const oldLength = isArray ? obj.length : 0;
       const oldValue = obj[prop];
 
       // Make nested objects reactive
@@ -68,6 +70,15 @@ export function reactive(target) {
       if (oldValue !== value && deps.has(prop)) {
         const propDeps = deps.get(prop);
         for (const watcher of propDeps) {
+          queueWatcher(watcher);
+        }
+      }
+
+      // Array index writes can grow/shrink length without notifying "length"
+      // deps, because the later implicit length write may appear unchanged.
+      if (isArray && prop !== 'length' && obj.length !== oldLength && deps.has('length')) {
+        const lengthDeps = deps.get('length');
+        for (const watcher of lengthDeps) {
           queueWatcher(watcher);
         }
       }

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>bedrockjs sync — connected counter</title>
+    <style>
+      body {
+        font: 14px system-ui;
+        max-width: 600px;
+        margin: 2rem auto;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .back-link {
+        margin-bottom: 1rem;
+        color: #007acc;
+        text-decoration: none;
+        font-size: 12px;
+      }
+
+      .back-link:hover {
+        text-decoration: underline;
+      }
+
+      counter-app {
+        display: block;
+      }
+
+      .counter-display {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        text-align: center;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .value {
+        font-size: 72px;
+        font-weight: bold;
+        line-height: 1;
+        margin-bottom: 0.5rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .label {
+        font-size: 16px;
+        opacity: 0.9;
+      }
+
+      .controls {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      button {
+        flex: 1;
+        padding: 1rem;
+        font-size: 16px;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .btn-minus,
+      .btn-plus {
+        background: #667eea;
+        color: white;
+      }
+
+      .btn-minus:hover,
+      .btn-plus:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-minus:active,
+      .btn-plus:active {
+        transform: translateY(0);
+      }
+
+      .btn-reset {
+        background: #f5f5f5;
+        color: #333;
+      }
+
+      .btn-reset:hover {
+        background: #e0e0e0;
+        transform: translateY(-2px);
+      }
+
+      .hint {
+        color: #666;
+        font-size: 13px;
+        line-height: 1.5;
+        background: #f9f9f9;
+        padding: 1rem;
+        border-left: 3px solid #667eea;
+        border-radius: 4px;
+      }
+
+      h1 {
+        margin-top: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <a href="./index.html" class="back-link">← Back to examples</a>
+    <h1>Connected Counter</h1>
+    <counter-app></counter-app>
+    <script type="module" src="./counter.js"></script>
+  </body>
+</html>

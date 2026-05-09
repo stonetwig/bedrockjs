@@ -1,5 +1,10 @@
 /**
- * BedrockJS sync — todo example server.
+ * BedrockJS sync — example server.
+ *
+ * Demonstrates real-time data synchronization with:
+ * - Todo app: collaborative task list
+ * - Connected counter: shared counter across clients
+ * - Live chat: real-time messaging
  *
  * Run from the repo root:
  *   deno task sync:dev
@@ -16,7 +21,7 @@ const ROOT = new URL('../..', import.meta.url).pathname;
 
 const sync = await createSyncServer({
   storage: denoKvAdapter({ path: ':memory:' }),
-  models: ['todo'],
+  models: ['todo', 'counter', 'message'],
   cors: true,
 });
 

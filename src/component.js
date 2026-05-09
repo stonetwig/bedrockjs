@@ -151,13 +151,12 @@ export class Component extends HTMLElement {
     // Read attributes into properties
     this.#readAttributes();
 
-    // Initial render
-    this.#doRender();
-
-    // Set up reactive watching
+    // Set up reactive watching — runs render() and tracks all reactive
+    // properties accessed during render. Re-runs whenever any tracked
+    // dependency changes.
     this.#stopWatch = watch(() => {
       this.#doRender();
-    }, { immediate: false });
+    });
   }
 
   /**
