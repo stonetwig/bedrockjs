@@ -1,6 +1,6 @@
 ![BedrockJS](bedrockjs.png)
 
-A lightweight web framework built on Web Components with lit-html-style templating, reactive state management, and a router with async data fetching.
+A lightweight web framework built on Web Components with lit-html-style templating, reactive state management, and a router with async data fetching. **Deno-first, TypeScript-ready, with optional offline-first data sync.**
 
 ## Features
 
@@ -10,7 +10,9 @@ A lightweight web framework built on Web Components with lit-html-style templati
 - **Reactive State** - Proxy-based reactivity with automatic dependency tracking
 - **Router** - History API routing with async data loaders
 - **Shadow DOM Support** - Optional style encapsulation per component
+- **Offline-First Sync** - IndexedDB-backed data sync with auto-upload and real-time SSE updates
 - **Zero Dependencies** - Pure JavaScript, no build step required
+- **TypeScript Ready** - Full TypeScript support, type-safe imports, Deno native
 
 ## Installation
 
@@ -106,6 +108,71 @@ class MyCounter extends Component {
 }
 
 MyCounter.register();
+```
+
+## TypeScript
+
+BedrockJS is designed with TypeScript in mind. All modules have type definitions (`.d.ts`), and you can use `as const` for compile-time property validation.
+
+### Setup
+
+**Deno:**
+
+```bash
+deno add jsr:@rendly/bedrockjs
+```
+
+Import and use directly:
+
+```typescript
+import { html, Component, keyed } from '@rendly/bedrockjs';
+import { syncedModel } from '@rendly/bedrockjs/sync';
+
+interface Todo {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
+const TodoModel = syncedModel<Todo>('todo', {
+  title: String,
+  done: Boolean,
+});
+```
+
+**Node / NPM:**
+
+Use the JSR package:
+
+```bash
+npm install @jsr/rendly__bedrockjs
+```
+
+Or via TypeScript-aware bundlers (esbuild, Vite, etc.):
+
+```typescript
+import { html, Component } from '@jsr/rendly__bedrockjs';
+```
+
+### Type-Safe Components
+
+```typescript
+class UserCard extends Component {
+  static tag = 'user-card';
+  static properties = {
+    userId: { type: String },
+    onEdit: { type: Function },
+  } as const;
+
+  userId?: string;
+  onEdit?: (id: string) => void;
+
+  render() {
+    return html`<div>${this.userId}</div>`;
+  }
+}
+
+UserCard.register();
 ```
 
 ## Core Concepts
@@ -402,6 +469,76 @@ navigate('/login', { replace: true });
 |---------|-----|--------|
 | `/users/:id` | `/users/123` | `{ id: '123' }` |
 | `/posts/:category/:slug` | `/posts/tech/hello` | `{ category: 'tech', slug: 'hello' }` |
+
+## Offline-First Sync
+
+BedrockJS includes an optional real-time data synchronization layer perfect for offline-first apps, PWAs, and collaborative features.
+
+### Quick Example
+
+```javascript
+import { syncedModel, configureSync } from 'bedrockjs/sync';
+
+// Configure once
+configureSync({ baseUrl: 'http://localhost:3000' });
+
+// Define a model
+const Todo = syncedModel('todo', {
+  title: String,
+  done: Boolean,
+});
+
+// Use in your component
+class TodoList extends Component {
+  static tag = 'todo-list';
+
+  render() {
+    const todos = Todo.all();  // Reactive array
+    return html`
+      <ul>
+        ${todos.map(todo => html`
+          <li>
+            <input type="checkbox" .checked=${todo.done}
+              on-change=${e => todo.done = e.target.checked}>
+            ${todo.title}
+          </li>
+        `)}
+      </ul>
+      <button on-click=${() => {
+        Todo.create({ title: 'New task', done: false });
+      }}>Add</button>
+    `;
+  }
+}
+
+TodoList.register();
+```
+
+### Key Features
+
+- **Offline**: Read/write via IndexedDB; changes queue locally and sync on reconnect
+- **Real-time**: Server-Sent Events stream changes to all connected clients
+- **Conflict resolution**: Per-field Last-Writer-Wins with server timestamps
+- **Pluggable storage**: Deno KV (default) or SQLite adapter on the server
+- **Multi-tenant**: Optional `scope()` hook for per-user data isolation
+
+### Server Setup (Deno)
+
+```typescript
+import { serve } from 'std/http/server.ts';
+import { createSyncServer } from 'bedrockjs/sync/server';
+
+const syncServer = createSyncServer({ /* adapter options */ });
+
+serve((req) => {
+  if (req.url.startsWith('/sync/')) {
+    return syncServer(req);
+  }
+  return new Response('Not found', { status: 404 });
+}, { port: 3000 });
+```
+
+For detailed API, examples, and adapter setup, see [Sync Documentation](src/sync/README.md).
 
 ## API Reference
 

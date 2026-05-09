@@ -83,6 +83,123 @@ Template patterns:
 - Avoid mutating inputs in render; update reactive state via setters.
 - Keep `shadow` opt-in; default components are light DOM unless `static shadow = true`.
 
+## Deno-First Development
+
+BedrockJS is **Deno-native** and published on JSR (https://jsr.io/@rendly/bedrockjs).
+
+### Getting Started with Deno
+
+Install BedrockJS:
+
+```bash
+deno add jsr:@rendly/bedrockjs
+```
+
+This adds the dependency to `deno.json`. All imports are TypeScript-ready by default.
+
+### Deno Imports
+
+```typescript
+import { html, Component, keyed } from '@rendly/bedrockjs';
+import { reactive, watch, computed } from '@rendly/bedrockjs/reactive';
+import { createRouter, navigate } from '@rendly/bedrockjs/router';
+
+// With TypeScript generics
+import { syncedModel } from '@rendly/bedrockjs/sync';
+const User = syncedModel<{ id: string; name: string }>('user', {
+  name: String,
+});
+```
+
+### Sync Module (Server-Side)
+
+For offline-first, real-time data sync on the server:
+
+```typescript
+// deno.json
+{
+  "imports": {
+    "bedrockjs": "jsr:@rendly/bedrockjs",
+    "bedrockjs/sync/server": "jsr:@rendly/bedrockjs/sync/server"
+  }
+}
+```
+
+Server setup:
+
+```typescript
+import { serve } from 'std/http/server.ts';
+import { createSyncServer } from 'bedrockjs/sync/server';
+
+// Use Deno KV (default, no setup needed)
+const syncServer = createSyncServer({
+  adapter: 'deno-kv',  // or custom adapter
+  scope: (req) => {
+    const user = req.headers.get('x-user-id');
+    return user || null;
+  }
+});
+
+serve((req: Request) => {
+  if (req.url.startsWith('/sync/')) {
+    return syncServer(req);
+  }
+  return new Response('Not found', { status: 404 });
+}, { port: 3000 });
+```
+
+Run with unstable Deno KV:
+
+```bash
+deno run --unstable-kv --allow-net server.ts
+```
+
+For SQLite adapter:
+
+```bash
+deno add jsr:@db/sqlite
+```
+
+Then:
+
+```typescript
+import { createSyncServer, sqliteAdapter } from 'bedrockjs/sync/server';
+
+const syncServer = createSyncServer({
+  adapter: sqliteAdapter('./data.db'),
+});
+```
+
+### Testing & Tasks
+
+```bash
+# Run tests (BedrockJS includes sync unit tests)
+deno task test
+
+# Run a Deno server (e.g., example sync app)
+deno task sync:dev
+```
+
+Example `deno.json` tasks:
+
+```json
+{
+  "tasks": {
+    "dev": "deno run --allow-net --allow-read ...",
+    "test": "deno test --allow-read --allow-write --allow-env --allow-net --allow-ffi --unstable-kv src/sync/__tests__/",
+    "sync:dev": "deno run --unstable-kv --allow-net --allow-read --allow-env examples/sync/server.ts"
+  }
+}
+```
+
+### Prompt Template for Deno + BedrockJS
+
+"Create a Deno server using BedrockJS Sync:
+- File: `new file: src/server.ts`
+- Use Deno KV for storage (default)
+- Add a scope hook for multi-tenant isolation
+- Return full TypeScript file, ready to `deno run --unstable-kv --allow-net`"
+
 ---
 
 For more complete API examples and edge cases, see `LLMS.md` in this repo.
