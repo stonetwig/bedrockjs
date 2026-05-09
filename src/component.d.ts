@@ -1,4 +1,4 @@
-import type { TemplateResult } from './html.js';
+import type { TemplateResult } from './html.d.ts';
 
 export interface ComponentPropertyConfig<T = any> {
   type?: { new (...args: any[]): T } | Function;

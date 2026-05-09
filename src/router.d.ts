@@ -1,4 +1,4 @@
-import type { Component } from './component.js';
+import type { Component } from './component.d.ts';
 
 export interface RouteDefinition {
   path: string;

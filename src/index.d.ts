@@ -1,7 +1,7 @@
-export { html, TemplateResult, isTemplateResult } from './html.js';
-export { render, keyed } from './render.js';
-export { Component, defineComponent, autoRegister } from './component.js';
-export { reactive, watch, computed, signal, batch } from './reactive.js';
+export { html, TemplateResult, isTemplateResult } from './html.d.ts';
+export { render, keyed } from './render.d.ts';
+export { Component, defineComponent, autoRegister } from './component.d.ts';
+export { reactive, watch, computed, signal, batch } from './reactive.d.ts';
 export {
   Router,
   RouterOutlet,
@@ -9,4 +9,4 @@ export {
   createRouter,
   navigate,
   getParams
-} from './router.js';
+} from './router.d.ts';

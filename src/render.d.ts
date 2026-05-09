@@ -1,4 +1,4 @@
-import type { TemplateResult } from './html.js';
+import type { TemplateResult } from './html.d.ts';
 
 export function render(result: TemplateResult, container: Element): void;
 

@@ -12,6 +12,15 @@
     "./sync": "./src/sync/index.ts",
     "./sync/server": "./src/sync/server-entry.ts"
   },
+  "compilerOptions": {
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext",
+      "deno.ns",
+      "deno.unstable"
+    ]
+  },
   "tasks": {
     "dev": "PORT=3000 deno run --unstable-kv --allow-net --allow-read --allow-env examples/sync/server.ts",
     "dev:open": "sh -c \"PORT=3000 deno run --unstable-kv --allow-net --allow-read --allow-env examples/sync/server.ts & sleep 0.5; (xdg-open http://localhost:3000/examples/ || open http://localhost:3000/examples/)\"",
