@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+
+# Editors / IDEs
+.vscode-test/
+.idea/
+
+# Node package managers
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Coverage / test output
+coverage/
+*.lcov
+
+# Build artifacts
+dist/
+build/
+
+# Temp files and folders
+tmp/
+temp/
+.cache/
+
+# Local Deno directory override (if used)
+deno_dir/
+
+# Local data files
+*.db
+*.sqlite
+*.sqlite3

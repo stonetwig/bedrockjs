@@ -8,8 +8,6 @@
  *   ['bedrockjs', scope, model, 'op', opId]     → { cursor: number }
  */
 
-/// <reference lib="deno.unstable" />
-
 import type { Row, Change } from '../protocol.ts';
 import type { StorageAdapter } from './types.ts';
 

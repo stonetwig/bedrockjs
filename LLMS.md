@@ -4,13 +4,14 @@ This document provides comprehensive information for LLMs to generate code using
 
 ## Framework Overview
 
-BedrockJS is a lightweight web framework with four core modules:
+BedrockJS is a lightweight web framework with six core modules:
 
 1. **html.js** - Tagged template literal parser
 2. **render.js** - DOM rendering engine
 3. **component.js** - Web Component base class
 4. **reactive.js** - Reactive state management
 5. **router.js** - Client-side router
+6. **sync/** - Offline-first data sync (IndexedDB + HTTP ops + SSE)
 
 ## Import Patterns
 
@@ -33,11 +34,16 @@ import {
   navigate
 } from 'bedrockjs';
 
+// Sync imports
+import { syncedModel, configureSync } from 'bedrockjs/sync';
+import { createSyncServer, denoKvAdapter } from 'bedrockjs/sync/server';
+
 // Or import from specific modules
 import { html } from 'bedrockjs/html';
 import { Component } from 'bedrockjs/component';
 import { reactive, watch } from 'bedrockjs/reactive';
 import { createRouter, navigate } from 'bedrockjs/router';
+import { syncedModel, configureSync } from 'bedrockjs/sync';
 ```
 
 ---
@@ -755,6 +761,83 @@ class UserStatus extends Component {
 store.user = { name: 'Alice' };
 store.theme = 'dark';
 ```
+
+---
+
+## Sync Engine (`sync/*`)
+
+BedrockJS Sync provides optimistic local writes, persistence in IndexedDB, HTTP
+op batching, and real-time server updates over Server-Sent Events (SSE).
+
+### Client Setup
+
+```javascript
+import { syncedModel, configureSync } from 'bedrockjs/sync';
+
+// Call before the first syncedModel(...) call.
+configureSync({
+  baseUrl: '/sync',          // default is same-origin /sync
+  dbName: 'my-app-sync-db',  // optional; defaults to bedrockjs-sync
+});
+
+const Todo = syncedModel('todo', {
+  fields: {
+    id: 'string',
+    title: 'string',
+    completed: 'boolean',
+    createdAt: 'datetime',
+    updatedAt: 'datetime',
+  },
+});
+```
+
+### Synced Model API
+
+```javascript
+await Todo.create({
+  id: crypto.randomUUID(),
+  title: 'Ship release',
+  completed: false,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
+
+await Todo.update(id, { completed: true, updatedAt: new Date() });
+await Todo.delete(id);
+
+const one = Todo.get(id);      // item | undefined
+const all = Todo.all();        // reactive array
+const open = Todo.where(t => !t.completed);
+```
+
+### Server Setup (Deno)
+
+```typescript
+import { createSyncServer, denoKvAdapter } from 'bedrockjs/sync/server';
+
+const sync = await createSyncServer({
+  storage: denoKvAdapter({ path: ':memory:' }),
+  models: ['todo', 'counter', 'message'],
+  basePath: '/sync',
+  cors: true,
+});
+
+Deno.serve((req: Request) => sync(req), { port: 3000 });
+```
+
+### Server Routes
+
+- `POST /sync/:model/ops` - apply batched create/update/delete operations
+- `GET /sync/:model/stream?since=N` - SSE stream of subsequent changes
+- `GET /sync/:model/snapshot?since=N` - JSON changes since cursor
+
+### Important Notes
+
+- Use same-origin `baseUrl: '/sync'` when serving app + sync API from one port.
+- If running multiple sync demos side-by-side, use separate `dbName` values to
+  avoid IndexedDB object-store schema conflicts.
+- Remote SSE updates are applied to local IndexedDB and automatically propagate
+  to reactive UI reads from `Model.get(...)`, `Model.all()`, and `Model.where(...)`.
 
 ---
 
