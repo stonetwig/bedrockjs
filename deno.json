@@ -1,6 +1,6 @@
 {
   "name": "@rendly/bedrockjs",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "license": "MIT",
   "exports": {
     ".": "./src/index.ts",
@@ -11,6 +11,20 @@
     "./router": "./src/router.ts",
     "./sync": "./src/sync/index.ts",
     "./sync/server": "./src/sync/server-entry.ts"
+  },
+  "publish": {
+    "include": [
+      "README.md",
+      "changelog.md",
+      "package.json",
+      "src/**/*.d.ts",
+      "src/**/*.js",
+      "src/**/*.ts",
+      "src/sync/README.md"
+    ],
+    "exclude": [
+      "src/sync/__tests__"
+    ]
   },
   "compilerOptions": {
     "lib": [

@@ -10,7 +10,11 @@
 const OUTBOX = '__outbox__';
 const CURSOR = '__cursor__';
 
-/** @type {Map<string, Promise<IDBDatabase>>} */
+/**
+ * @typedef {{ models: Set<string>, db: IDBDatabase | null, promise: Promise<IDBDatabase> }} DbEntry
+ */
+
+/** @type {Map<string, DbEntry>} */
 const dbCache = new Map();
 
 /**
@@ -22,21 +26,46 @@ const dbCache = new Map();
  * @returns {Promise<IDBDatabase>}
  */
 export function openDb(dbName, models) {
-  const cached = dbCache.get(dbName);
-  if (cached) {
-    return cached.then((db) => ensureStores(db, dbName, models));
+  let entry = dbCache.get(dbName);
+  if (!entry) {
+    entry = {
+      models: new Set(models),
+      db: null,
+      promise: /** @type {Promise<IDBDatabase>} */ (Promise.resolve(null)),
+    };
+    entry.promise = openTracked(dbName, entry, undefined);
+    dbCache.set(dbName, entry);
+    return entry.promise;
   }
-  const p = openInternal(dbName, models, undefined);
-  dbCache.set(dbName, p);
-  return p;
+
+  for (const model of models) entry.models.add(model);
+
+  entry.promise = entry.promise
+    .catch(() => null)
+    .then((db) => ensureStores(db, dbName, entry));
+  return entry.promise;
+}
+
+/**
+ * @param {string} dbName
+ * @param {DbEntry} entry
+ * @param {number | undefined} version
+ */
+function openTracked(dbName, entry, version) {
+  return openInternal(dbName, [...entry.models], version).then((db) => {
+    entry.db = db;
+    db.onversionchange = () => {
+      closeTracked(entry, db);
+    };
+    return db;
+  });
 }
 
 function openInternal(dbName, models, version) {
   return new Promise((resolve, reject) => {
-    const req =
-      version === undefined
-        ? indexedDB.open(dbName)
-        : indexedDB.open(dbName, version);
+    const req = version === undefined
+      ? indexedDB.open(dbName)
+      : indexedDB.open(dbName, version);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(OUTBOX)) {
@@ -53,18 +82,51 @@ function openInternal(dbName, models, version) {
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
-    req.onblocked = () => reject(new Error('IndexedDB upgrade blocked'));
+    req.onblocked = () => {
+      console.warn(
+        `[bedrockjs/sync] IndexedDB upgrade for "${dbName}" is blocked by another open tab or connection`,
+      );
+    };
   });
 }
 
-async function ensureStores(db, dbName, models) {
+/**
+ * @param {IDBDatabase | null} db
+ * @param {string} dbName
+ * @param {DbEntry} entry
+ * @returns {Promise<IDBDatabase>}
+ */
+async function ensureStores(db, dbName, entry) {
+  if (!db || entry.db !== db) {
+    db = await openTracked(dbName, entry, undefined);
+  }
+
+  const models = [...entry.models];
   const missing = models.filter((m) => !db.objectStoreNames.contains(m));
   if (missing.length === 0) return db;
   const newVersion = db.version + 1;
+  closeTracked(entry, db);
+  try {
+    return await openTracked(dbName, entry, newVersion);
+  } catch (err) {
+    // Another tab may have upgraded first. Reopen the current version, then
+    // re-check because it may or may not include the model stores we need.
+    if (err && typeof err === 'object' && err.name === 'VersionError') {
+      const current = await openTracked(dbName, entry, undefined);
+      return ensureStores(current, dbName, entry);
+    }
+    throw err;
+  }
+}
+
+/**
+ * @param {DbEntry} entry
+ * @param {IDBDatabase} db
+ */
+function closeTracked(entry, db) {
+  if (entry.db === db) entry.db = null;
+  db.onversionchange = null;
   db.close();
-  const p = openInternal(dbName, models, newVersion);
-  dbCache.set(dbName, p);
-  return p;
 }
 
 /**

@@ -6,13 +6,13 @@
 
 import { reactive } from '../reactive.js';
 import {
-  openDb,
-  writeWithOutbox,
   applyServerRow,
-  getCursor as idbCursor,
-  getAll as idbGetAll,
-  readOutbox,
   deleteOutboxEntries,
+  getAll as idbGetAll,
+  getCursor as idbCursor,
+  openDb,
+  readOutbox,
+  writeWithOutbox,
 } from './indexeddb.js';
 import { makeOpId, now } from './protocol-runtime.js';
 
@@ -28,7 +28,6 @@ import { makeOpId, now } from './protocol-runtime.js';
  */
 export function defineSyncedModel(name, schema, ctx) {
   const dbName = ctx.dbName || 'bedrockjs-sync';
-  const dbPromise = openDb(dbName, [name]);
 
   // Reactive view: array of public records, plus an id index for fast lookup.
   const collection = reactive(/** @type {any[]} */ ([]));
@@ -70,10 +69,18 @@ export function defineSyncedModel(name, schema, ctx) {
     }
   }
 
+  async function withDb(operation) {
+    try {
+      return await operation(await openDb(dbName, [name]));
+    } catch (err) {
+      if (!isRetryableIdbError(err)) throw err;
+      return await operation(await openDb(dbName, [name]));
+    }
+  }
+
   // Initial hydration from IDB.
   const ready = (async () => {
-    const db = await dbPromise;
-    const rows = await idbGetAll(db, name);
+    const rows = await withDb((db) => idbGetAll(db, name));
     for (const r of rows) upsertLocal(r);
   })();
 
@@ -93,7 +100,6 @@ export function defineSyncedModel(name, schema, ctx) {
       throw new Error(`${name}.create: 'id' (string) is required`);
     }
     await ready;
-    const db = await dbPromise;
     const data = pickFields(schema, input);
     const row = buildLocalRow(input.id, data);
     const op = {
@@ -105,14 +111,13 @@ export function defineSyncedModel(name, schema, ctx) {
       clientTs: row.serverTs,
     };
     upsertLocal(row);
-    await writeWithOutbox(db, name, row, null, op);
+    await withDb((db) => writeWithOutbox(db, name, row, null, op));
     ctx.client.scheduleDrain(0);
     return publicView(row);
   }
 
   async function update(id, patch) {
     await ready;
-    const db = await dbPromise;
     const existing = byId.get(id);
     if (!existing) throw new Error(`${name}.update: no record ${id}`);
     const cleanPatch = pickFields(schema, patch);
@@ -136,14 +141,13 @@ export function defineSyncedModel(name, schema, ctx) {
       patch: cleanPatch,
       clientTs: ts,
     };
-    await writeWithOutbox(db, name, row, null, op);
+    await withDb((db) => writeWithOutbox(db, name, row, null, op));
     ctx.client.scheduleDrain(0);
     return publicView(row);
   }
 
   async function del(id) {
     await ready;
-    const db = await dbPromise;
     const existing = byId.get(id);
     if (!existing) return;
     const tombstone = {
@@ -162,7 +166,7 @@ export function defineSyncedModel(name, schema, ctx) {
       id,
       clientTs: tombstone.serverTs,
     };
-    await writeWithOutbox(db, name, null, id, op);
+    await withDb((db) => writeWithOutbox(db, name, null, id, op));
     ctx.client.scheduleDrain(0);
   }
 
@@ -197,23 +201,19 @@ export function defineSyncedModel(name, schema, ctx) {
   // Register with the sync client so server pushes land in the local store.
   ctx.client.registerModel(name, {
     onServerRow: async (row, cursor) => {
-      const db = await dbPromise;
-      await applyServerRow(db, name, row, cursor);
+      await withDb((db) => applyServerRow(db, name, row, cursor));
       upsertLocal(row);
       notify();
     },
     getCursor: async () => {
-      const db = await dbPromise;
-      return idbCursor(db, name);
+      return await withDb((db) => idbCursor(db, name));
     },
     getOutbox: async () => {
-      const db = await dbPromise;
-      const all = await readOutbox(db);
+      const all = await withDb((db) => readOutbox(db));
       return all.filter((e) => e.op.model === name);
     },
     ackOutbox: async (seqs) => {
-      const db = await dbPromise;
-      await deleteOutboxEntries(db, seqs);
+      await withDb((db) => deleteOutboxEntries(db, seqs));
     },
   });
 
@@ -249,4 +249,9 @@ function stripPublic(view) {
   void id;
   void rev;
   return rest;
+}
+
+function isRetryableIdbError(err) {
+  const name = err && typeof err === 'object' ? err.name : '';
+  return name === 'InvalidStateError' || name === 'NotFoundError';
 }

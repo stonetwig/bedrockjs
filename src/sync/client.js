@@ -33,8 +33,7 @@ const DEFAULT_BASE = '/sync';
 export function createSyncClient(opts = {}) {
   const baseUrl = (opts.baseUrl || DEFAULT_BASE).replace(/\/$/, '');
   const fetchFn = opts.fetch || globalThis.fetch.bind(globalThis);
-  const ESCtor =
-    opts.EventSource ||
+  const ESCtor = opts.EventSource ||
     (typeof EventSource !== 'undefined' ? EventSource : null);
 
   /** @type {Map<string, ModelHooks>} */
@@ -47,14 +46,16 @@ export function createSyncClient(opts = {}) {
 
   function registerModel(name, hooks) {
     models.set(name, hooks);
-    if (started) connectStream(name);
+    if (started) scheduleStreamConnect(name, 0);
   }
 
   async function connectStream(name) {
     if (!ESCtor) return; // SSR / no SSE — server-pull will still work via drain
+    if (!started || streams.has(name)) return;
     const hooks = models.get(name);
     if (!hooks) return;
     const cursor = await hooks.getCursor();
+    if (!started || !models.has(name) || streams.has(name)) return;
     const url = `${baseUrl}/${encodeURIComponent(name)}/stream?since=${cursor}`;
     const es = new ESCtor(url);
     streams.set(name, es);
@@ -72,10 +73,21 @@ export function createSyncClient(opts = {}) {
     };
   }
 
+  function scheduleStreamConnect(name, delay) {
+    setTimeout(() => {
+      connectStream(name).catch((err) => {
+        console.warn(`[bedrockjs/sync] stream setup failed for "${name}"`, err);
+        if (started && models.has(name) && !streams.has(name)) {
+          scheduleStreamConnect(name, drainBackoffMs);
+        }
+      });
+    }, delay);
+  }
+
   function start() {
     if (started) return;
     started = true;
-    for (const name of models.keys()) connectStream(name);
+    for (const name of models.keys()) scheduleStreamConnect(name, 0);
     if (typeof globalThis.addEventListener === 'function') {
       globalThis.addEventListener('online', () => scheduleDrain(0));
     }
