@@ -22,7 +22,7 @@ export interface Row {
   rev: number;
   /** Server timestamp (ms) when the row was last touched. */
   serverTs: number;
-  /** Per-field server timestamps (ms) used for last-writer-wins merges. */
+  /** Per-field write timestamps (ms) used for last-writer-wins merges. */
   fieldTs: Record<string, number>;
   /** Tombstone marker; when set, the row is deleted. */
   deletedAt?: number;
@@ -41,28 +41,31 @@ export interface Change {
 /** Mutation op sent client → server. */
 export type Op =
   | {
-      opId: string;
-      type: "create";
-      model: string;
-      id: string;
-      data: Record<string, unknown>;
-      clientTs: number;
-    }
+    opId: string;
+    type: "create";
+    model: string;
+    id: string;
+    data: Record<string, unknown>;
+    /** Monotonic client-side write timestamp for conflict ordering. */
+    clientTs: number;
+  }
   | {
-      opId: string;
-      type: "update";
-      model: string;
-      id: string;
-      patch: Record<string, unknown>;
-      clientTs: number;
-    }
+    opId: string;
+    type: "update";
+    model: string;
+    id: string;
+    patch: Record<string, unknown>;
+    /** Monotonic client-side write timestamp for conflict ordering. */
+    clientTs: number;
+  }
   | {
-      opId: string;
-      type: "delete";
-      model: string;
-      id: string;
-      clientTs: number;
-    };
+    opId: string;
+    type: "delete";
+    model: string;
+    id: string;
+    /** Monotonic client-side write timestamp for conflict ordering. */
+    clientTs: number;
+  };
 
 /** Per-op result returned by POST /sync/:model/ops. */
 export interface OpResult {
@@ -107,15 +110,20 @@ export interface SnapshotResponse {
  * available, falling back to a timestamp + random suffix.
  */
 export function makeOpId(): string {
-  const c =
-    (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
   if (c && typeof c.randomUUID === "function") return c.randomUUID();
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${Date.now().toString(36)}-${
+    Math.random().toString(36).slice(2, 10)
+  }`;
 }
 
 /** Current epoch ms. */
+let lastNow = 0;
+
 export function now(): number {
-  return Date.now();
+  const wallNow = Date.now();
+  lastNow = Math.max(wallNow, lastNow + 1);
+  return lastNow;
 }
 
 /**
@@ -148,9 +156,11 @@ export function applyOp(
   serverTs: number,
   nextRev: number,
 ): Row | null {
-  // Delete: tombstone wins if its serverTs >= existing.serverTs.
+  const writeTs = opWriteTs(op, serverTs);
+
+  // Delete: tombstone wins only if it is at least as recent as the row.
   if (op.type === "delete") {
-    if (existing && existing.deletedAt && existing.deletedAt >= serverTs) {
+    if (existing && latestWriteTs(existing) > writeTs) {
       return null;
     }
     return {
@@ -158,7 +168,7 @@ export function applyOp(
       rev: nextRev,
       serverTs,
       fieldTs: existing?.fieldTs ?? {},
-      deletedAt: serverTs,
+      deletedAt: writeTs,
       data: existing?.data ?? {},
     };
   }
@@ -169,8 +179,11 @@ export function applyOp(
       // Idempotent: create on existing row is ignored.
       return null;
     }
+    if (existing?.deletedAt && existing.deletedAt >= writeTs) {
+      return null;
+    }
     const fieldTs: Record<string, number> = {};
-    for (const k of Object.keys(op.data)) fieldTs[k] = serverTs;
+    for (const k of Object.keys(op.data)) fieldTs[k] = writeTs;
     return {
       id: op.id,
       rev: nextRev,
@@ -193,9 +206,9 @@ export function applyOp(
 
   for (const [k, v] of Object.entries(op.patch)) {
     const prevTs = newFieldTs[k] ?? 0;
-    if (serverTs >= prevTs) {
+    if (writeTs >= prevTs) {
       newData[k] = v;
-      newFieldTs[k] = serverTs;
+      newFieldTs[k] = writeTs;
       changed = true;
     }
   }
@@ -209,4 +222,16 @@ export function applyOp(
     fieldTs: newFieldTs,
     data: newData,
   };
+}
+
+function opWriteTs(op: Op, fallback: number): number {
+  return Number.isFinite(op.clientTs) ? op.clientTs : fallback;
+}
+
+function latestWriteTs(row: Row): number {
+  let latest = row.deletedAt ?? 0;
+  for (const ts of Object.values(row.fieldTs)) {
+    if (ts > latest) latest = ts;
+  }
+  return latest;
 }

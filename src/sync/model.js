@@ -4,7 +4,7 @@
  * plus a reactive collection for direct use in templates.
  */
 
-import { reactive } from '../reactive.js';
+import { reactive } from "../reactive.js";
 import {
   applyServerRow,
   deleteOutboxEntries,
@@ -13,8 +13,8 @@ import {
   openDb,
   readOutbox,
   writeWithOutbox,
-} from './indexeddb.js';
-import { makeOpId, now } from './protocol-runtime.js';
+} from "./indexeddb.js";
+import { makeOpId, now } from "./protocol-runtime.js";
 
 /**
  * @typedef {'string'|'number'|'boolean'|'datetime'} FieldKind
@@ -27,12 +27,14 @@ import { makeOpId, now } from './protocol-runtime.js';
  * @param {{ client: any, dbName?: string }} ctx
  */
 export function defineSyncedModel(name, schema, ctx) {
-  const dbName = ctx.dbName || 'bedrockjs-sync';
+  const dbName = ctx.dbName || "bedrockjs-sync";
 
   // Reactive view: array of public records, plus an id index for fast lookup.
   const collection = reactive(/** @type {any[]} */ ([]));
   /** @type {Map<string, any>} */
   const byId = new Map();
+  /** @type {Map<string, any>} */
+  const rowsById = new Map();
 
   function publicView(row) {
     // Strip internal metadata; expose data + id + rev.
@@ -41,6 +43,7 @@ export function defineSyncedModel(name, schema, ctx) {
 
   function upsertLocal(row) {
     if (row.deletedAt) {
+      rowsById.set(row.id, row);
       const existing = byId.get(row.id);
       if (!existing) return;
       byId.delete(row.id);
@@ -48,6 +51,7 @@ export function defineSyncedModel(name, schema, ctx) {
       if (idx >= 0) collection.splice(idx, 1);
       return;
     }
+    rowsById.set(row.id, row);
     const view = publicView(row);
     const existing = byId.get(row.id);
     if (existing) {
@@ -86,7 +90,7 @@ export function defineSyncedModel(name, schema, ctx) {
 
   /**
    * Build a local optimistic Row from user-supplied data.
-   * Server will overwrite serverTs/rev/fieldTs on confirmation.
+   * Server will confirm rev/serverTs when the row is accepted.
    */
   function buildLocalRow(id, data) {
     const ts = now();
@@ -96,7 +100,7 @@ export function defineSyncedModel(name, schema, ctx) {
   }
 
   async function create(input) {
-    if (!input || typeof input.id !== 'string') {
+    if (!input || typeof input.id !== "string") {
       throw new Error(`${name}.create: 'id' (string) is required`);
     }
     await ready;
@@ -104,7 +108,7 @@ export function defineSyncedModel(name, schema, ctx) {
     const row = buildLocalRow(input.id, data);
     const op = {
       opId: makeOpId(),
-      type: 'create',
+      type: "create",
       model: name,
       id: input.id,
       data,
@@ -120,22 +124,27 @@ export function defineSyncedModel(name, schema, ctx) {
     await ready;
     const existing = byId.get(id);
     if (!existing) throw new Error(`${name}.update: no record ${id}`);
+    const existingRow = rowsById.get(id);
     const cleanPatch = pickFields(schema, patch);
     const ts = now();
     // Reconstruct full row from public view + new patch.
-    const newData = { ...stripPublic(existing), ...cleanPatch };
+    const newData = {
+      ...(existingRow?.data ?? stripPublic(existing)),
+      ...cleanPatch,
+    };
+    const fieldTs = { ...(existingRow?.fieldTs ?? {}) };
+    for (const k of Object.keys(cleanPatch)) fieldTs[k] = ts;
     const row = {
       id,
-      rev: existing.rev || 0,
+      rev: existingRow?.rev ?? existing.rev ?? 0,
       serverTs: ts,
-      fieldTs: {},
+      fieldTs,
       data: newData,
     };
-    for (const k of Object.keys(newData)) row.fieldTs[k] = ts;
     upsertLocal(row);
     const op = {
       opId: makeOpId(),
-      type: 'update',
+      type: "update",
       model: name,
       id,
       patch: cleanPatch,
@@ -150,23 +159,25 @@ export function defineSyncedModel(name, schema, ctx) {
     await ready;
     const existing = byId.get(id);
     if (!existing) return;
+    const existingRow = rowsById.get(id);
+    const ts = now();
     const tombstone = {
       id,
-      rev: existing.rev || 0,
-      serverTs: now(),
-      fieldTs: {},
-      deletedAt: now(),
-      data: {},
+      rev: existingRow?.rev ?? existing.rev ?? 0,
+      serverTs: ts,
+      fieldTs: existingRow?.fieldTs ?? {},
+      deletedAt: ts,
+      data: existingRow?.data ?? stripPublic(existing),
     };
     upsertLocal(tombstone);
     const op = {
       opId: makeOpId(),
-      type: 'delete',
+      type: "delete",
       model: name,
       id,
-      clientTs: tombstone.serverTs,
+      clientTs: ts,
     };
-    await withDb((db) => writeWithOutbox(db, name, null, id, op));
+    await withDb((db) => writeWithOutbox(db, name, tombstone, null, op));
     ctx.client.scheduleDrain(0);
   }
 
@@ -201,8 +212,10 @@ export function defineSyncedModel(name, schema, ctx) {
   // Register with the sync client so server pushes land in the local store.
   ctx.client.registerModel(name, {
     onServerRow: async (row, cursor) => {
-      await withDb((db) => applyServerRow(db, name, row, cursor));
-      upsertLocal(row);
+      const applied = await withDb((db) =>
+        applyServerRow(db, name, row, cursor)
+      );
+      upsertLocal(applied);
       notify();
     },
     getCursor: async () => {
@@ -234,10 +247,10 @@ export function defineSyncedModel(name, schema, ctx) {
 function pickFields(schema, input) {
   const out = {};
   for (const [k, kind] of Object.entries(schema.fields)) {
-    if (k === 'id' || k === 'rev') continue;
+    if (k === "id" || k === "rev") continue;
     if (k in input) {
       let v = input[k];
-      if (kind === 'datetime' && v instanceof Date) v = v.toISOString();
+      if (kind === "datetime" && v instanceof Date) v = v.toISOString();
       out[k] = v;
     }
   }
@@ -252,6 +265,6 @@ function stripPublic(view) {
 }
 
 function isRetryableIdbError(err) {
-  const name = err && typeof err === 'object' ? err.name : '';
-  return name === 'InvalidStateError' || name === 'NotFoundError';
+  const name = err && typeof err === "object" ? err.name : "";
+  return name === "InvalidStateError" || name === "NotFoundError";
 }

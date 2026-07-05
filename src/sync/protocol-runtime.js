@@ -19,7 +19,11 @@ export function makeOpId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+let lastNow = 0;
+
 /** @returns {number} */
 export function now() {
-  return Date.now();
+  const wallNow = Date.now();
+  lastNow = Math.max(wallNow, lastNow + 1);
+  return lastNow;
 }

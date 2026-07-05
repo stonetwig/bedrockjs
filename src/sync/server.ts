@@ -26,16 +26,20 @@ import {
   PROTOCOL_VERSION,
   type Row,
   type SnapshotResponse,
-} from './protocol.ts';
-import type { StorageAdapter } from './adapters/types.ts';
+} from "./protocol.ts";
+import type { StorageAdapter } from "./adapters/types.ts";
 
 export interface SyncServerOptions {
   storage: StorageAdapter;
   models: string[];
   /** Hook used to scope all storage; return null/undefined to deny (401). */
-  scope?: (req: Request) => string | null | undefined | Promise<
-    string | null | undefined
-  >;
+  scope?: (req: Request) =>
+    | string
+    | null
+    | undefined
+    | Promise<
+      string | null | undefined
+    >;
   /** URL prefix for all sync routes. Defaults to `/sync`. */
   basePath?: string;
   /** Enable permissive CORS (Access-Control-Allow-Origin: *). */
@@ -47,19 +51,20 @@ type Subscriber = (ev: ChangeEvent) => void;
 export async function createSyncServer(
   opts: SyncServerOptions,
 ): Promise<(req: Request) => Promise<Response>> {
-  const basePath = (opts.basePath ?? '/sync').replace(/\/$/, '');
+  const basePath = (opts.basePath ?? "/sync").replace(/\/$/, "");
   const models = new Set(opts.models);
 
   await opts.storage.init(opts.models);
 
   // scope -> model -> Set<Subscriber>
   const subscribers = new Map<string, Map<string, Set<Subscriber>>>();
+  const rowLocks = new Map<string, Promise<void>>();
 
   function bus(scope: string, model: string): Set<Subscriber> {
     let perScope = subscribers.get(scope);
-    if (!perScope) subscribers.set(scope, (perScope = new Map()));
+    if (!perScope) subscribers.set(scope, perScope = new Map());
     let perModel = perScope.get(model);
-    if (!perModel) perScope.set(model, (perModel = new Set()));
+    if (!perModel) perScope.set(model, perModel = new Set());
     return perModel;
   }
 
@@ -75,13 +80,37 @@ export async function createSyncServer(
     }
   }
 
+  async function withRowLock<T>(
+    scope: string,
+    model: string,
+    id: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const key = `${scope}\0${model}\0${id}`;
+    const previous = rowLocks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.catch(() => undefined).then(() => gate);
+    rowLocks.set(key, tail);
+
+    await previous.catch(() => undefined);
+    try {
+      return await fn();
+    } finally {
+      release();
+      if (rowLocks.get(key) === tail) rowLocks.delete(key);
+    }
+  }
+
   function corsHeaders(): HeadersInit {
     return opts.cors
       ? {
-          'access-control-allow-origin': '*',
-          'access-control-allow-methods': 'GET, POST, OPTIONS',
-          'access-control-allow-headers': 'content-type',
-        }
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS",
+        "access-control-allow-headers": "content-type",
+      }
       : {};
   }
 
@@ -89,14 +118,14 @@ export async function createSyncServer(
     return new Response(JSON.stringify(body), {
       status,
       headers: {
-        'content-type': 'application/json',
+        "content-type": "application/json",
         ...corsHeaders(),
       },
     });
   }
 
   async function resolveScope(req: Request): Promise<string | null> {
-    if (!opts.scope) return '';
+    if (!opts.scope) return "";
     const s = await opts.scope(req);
     if (s === null || s === undefined) return null;
     return s;
@@ -111,10 +140,10 @@ export async function createSyncServer(
     try {
       body = await req.json();
     } catch {
-      return json({ error: 'invalid json' }, 400);
+      return json({ error: "invalid json" }, 400);
     }
     if (!body || !Array.isArray(body.ops)) {
-      return json({ error: 'invalid body' }, 400);
+      return json({ error: "invalid body" }, 400);
     }
     if (body.protocol !== PROTOCOL_VERSION) {
       return json(
@@ -128,27 +157,43 @@ export async function createSyncServer(
       if (op.model !== model) {
         results.push({
           opId: op.opId,
-          status: 'rejected',
-          error: 'model mismatch',
+          status: "rejected",
+          error: "model mismatch",
         });
         continue;
       }
-      const remembered = await opts.storage.rememberedOp(scope, model, op.opId);
-      if (remembered) {
-        results.push({
-          opId: op.opId,
-          status: 'duplicate',
-          row: remembered.row,
-          cursor: remembered.cursor,
-        });
-        continue;
-      }
-      const r = await applySingleOp(scope, model, op);
+      const r = await withRowLock(scope, model, op.id, async () => {
+        const remembered = await opts.storage.rememberedOp(
+          scope,
+          model,
+          op.opId,
+        );
+        if (remembered) {
+          return {
+            opId: op.opId,
+            status: "duplicate",
+            row: remembered.row,
+            cursor: remembered.cursor,
+          } satisfies OpResult;
+        }
+        const result = await applySingleOp(scope, model, op);
+        if (
+          result.status === "applied" && result.row && result.cursor != null
+        ) {
+          await opts.storage.rememberOp(
+            scope,
+            model,
+            op.opId,
+            result.row,
+            result.cursor,
+          );
+        }
+        return result;
+      });
       results.push(r);
-      if (r.status === 'applied' && r.row && r.cursor != null) {
-        await opts.storage.rememberOp(scope, model, op.opId, r.row, r.cursor);
+      if (r.status === "applied" && r.row && r.cursor != null) {
         publish(scope, {
-          type: 'change',
+          type: "change",
           model,
           id: r.row.id,
           row: r.row,
@@ -176,16 +221,16 @@ export async function createSyncServer(
       if (existing) {
         return {
           opId: op.opId,
-          status: 'duplicate',
+          status: "duplicate",
           row: existing,
           cursor: await opts.storage.currentCursor(scope, model),
         };
       }
-      return { opId: op.opId, status: 'rejected', error: 'no-op' };
+      return { opId: op.opId, status: "rejected", error: "no-op" };
     }
     const cursor = await opts.storage.appendChange(scope, model, merged);
     const finalRow: Row = { ...merged, rev: cursor };
-    return { opId: op.opId, status: 'applied', row: finalRow, cursor };
+    return { opId: op.opId, status: "applied", row: finalRow, cursor };
   }
 
   async function handleSnapshot(
@@ -222,8 +267,7 @@ export async function createSyncServer(
       async start(controller) {
         function send(ev: ChangeEvent) {
           if (closed) return;
-          const block =
-            `event: change\n` +
+          const block = `event: change\n` +
             `id: ${ev.cursor}\n` +
             `data: ${JSON.stringify(ev)}\n\n`;
           try {
@@ -235,9 +279,11 @@ export async function createSyncServer(
 
         // Catch-up: emit anything since `since` first.
         try {
-          for await (const c of opts.storage.changesSince(scope, model, since)) {
+          for await (
+            const c of opts.storage.changesSince(scope, model, since)
+          ) {
             send({
-              type: 'change',
+              type: "change",
               model,
               id: c.id,
               row: c.row,
@@ -275,7 +321,7 @@ export async function createSyncServer(
             /* ignore */
           }
         };
-        req.signal.addEventListener('abort', onAbort);
+        req.signal.addEventListener("abort", onAbort);
       },
       cancel() {
         closed = true;
@@ -285,10 +331,10 @@ export async function createSyncServer(
 
     return new Response(stream, {
       headers: {
-        'content-type': 'text/event-stream',
-        'cache-control': 'no-cache, no-transform',
-        connection: 'keep-alive',
-        'x-accel-buffering': 'no',
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache, no-transform",
+        connection: "keep-alive",
+        "x-accel-buffering": "no",
         ...corsHeaders(),
       },
     });
@@ -296,17 +342,17 @@ export async function createSyncServer(
 
   return async function handler(req: Request): Promise<Response> {
     const url = new URL(req.url);
-    if (!url.pathname.startsWith(basePath + '/')) {
-      return new Response('not found', { status: 404, headers: corsHeaders() });
+    if (!url.pathname.startsWith(basePath + "/")) {
+      return new Response("not found", { status: 404, headers: corsHeaders() });
     }
 
-    if (req.method === 'OPTIONS' && opts.cors) {
+    if (req.method === "OPTIONS" && opts.cors) {
       return new Response(null, { status: 204, headers: corsHeaders() });
     }
 
-    const tail = url.pathname.slice(basePath.length + 1).split('/');
+    const tail = url.pathname.slice(basePath.length + 1).split("/");
     if (tail.length !== 2) {
-      return json({ error: 'unknown route' }, 404);
+      return json({ error: "unknown route" }, 404);
     }
     const [modelEnc, action] = tail;
     const model = decodeURIComponent(modelEnc);
@@ -316,20 +362,20 @@ export async function createSyncServer(
 
     const scope = await resolveScope(req);
     if (scope === null) {
-      return json({ error: 'unauthorized' }, 401);
+      return json({ error: "unauthorized" }, 401);
     }
 
-    if (action === 'ops' && req.method === 'POST') {
+    if (action === "ops" && req.method === "POST") {
       return handleOps(req, scope, model);
     }
-    if (action === 'snapshot' && req.method === 'GET') {
-      const since = Number(url.searchParams.get('since') ?? '0') || 0;
+    if (action === "snapshot" && req.method === "GET") {
+      const since = Number(url.searchParams.get("since") ?? "0") || 0;
       return handleSnapshot(req, scope, model, since);
     }
-    if (action === 'stream' && req.method === 'GET') {
-      const since = Number(url.searchParams.get('since') ?? '0') || 0;
+    if (action === "stream" && req.method === "GET") {
+      const since = Number(url.searchParams.get("since") ?? "0") || 0;
       return handleStream(req, scope, model, since);
     }
-    return json({ error: 'unknown route' }, 404);
+    return json({ error: "unknown route" }, 404);
   };
 }

@@ -518,7 +518,7 @@ TodoList.register();
 
 - **Offline**: Read/write via IndexedDB; changes queue locally and sync on reconnect
 - **Real-time**: Server-Sent Events stream changes to all connected clients
-- **Conflict resolution**: Per-field Last-Writer-Wins with server timestamps
+- **Conflict resolution**: Per-field Last-Writer-Wins with monotonic write timestamps
 - **Pluggable storage**: Deno KV (default) or SQLite adapter on the server
 - **Multi-tenant**: Optional `scope()` hook for per-user data isolation
 

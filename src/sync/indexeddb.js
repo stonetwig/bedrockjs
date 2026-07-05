@@ -7,8 +7,8 @@
  *   - `__cursor__` (key = model name) holding the highest server cursor seen.
  */
 
-const OUTBOX = '__outbox__';
-const CURSOR = '__cursor__';
+const OUTBOX = "__outbox__";
+const CURSOR = "__cursor__";
 
 /**
  * @typedef {{ models: Set<string>, db: IDBDatabase | null, promise: Promise<IDBDatabase> }} DbEntry
@@ -69,14 +69,14 @@ function openInternal(dbName, models, version) {
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(OUTBOX)) {
-        db.createObjectStore(OUTBOX, { keyPath: 'seq', autoIncrement: true });
+        db.createObjectStore(OUTBOX, { keyPath: "seq", autoIncrement: true });
       }
       if (!db.objectStoreNames.contains(CURSOR)) {
         db.createObjectStore(CURSOR);
       }
       for (const m of models) {
         if (!db.objectStoreNames.contains(m)) {
-          db.createObjectStore(m, { keyPath: 'id' });
+          db.createObjectStore(m, { keyPath: "id" });
         }
       }
     };
@@ -111,7 +111,7 @@ async function ensureStores(db, dbName, entry) {
   } catch (err) {
     // Another tab may have upgraded first. Reopen the current version, then
     // re-check because it may or may not include the model stores we need.
-    if (err && typeof err === 'object' && err.name === 'VersionError') {
+    if (err && typeof err === "object" && err.name === "VersionError") {
       const current = await openTracked(dbName, entry, undefined);
       return ensureStores(current, dbName, entry);
     }
@@ -146,7 +146,7 @@ function txDone(tx) {
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve(undefined);
     tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error || new Error('transaction aborted'));
+    tx.onabort = () => reject(tx.error || new Error("transaction aborted"));
   });
 }
 
@@ -160,7 +160,7 @@ function txDone(tx) {
  * @returns {Promise<number>} outbox seq
  */
 export function writeWithOutbox(db, model, row, idIfDelete, op) {
-  const tx = db.transaction([model, OUTBOX], 'readwrite');
+  const tx = db.transaction([model, OUTBOX], "readwrite");
   const store = tx.objectStore(model);
   if (row) store.put(row);
   else if (idIfDelete) store.delete(idIfDelete);
@@ -174,43 +174,129 @@ export function writeWithOutbox(db, model, row, idIfDelete, op) {
  * @param {string} model
  * @param {Object} row
  * @param {number} cursor
+ * @returns {Promise<Object>}
  */
-export async function applyServerRow(db, model, row, cursor) {
-  const tx = db.transaction([model, CURSOR], 'readwrite');
-  if (row.deletedAt) {
-    tx.objectStore(model).delete(row.id);
-  } else {
-    tx.objectStore(model).put(row);
-  }
-  tx.objectStore(CURSOR).put(cursor, model);
-  await txDone(tx);
+export function applyServerRow(db, model, row, cursor) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([model, CURSOR], "readwrite");
+    const store = tx.objectStore(model);
+    const cursorStore = tx.objectStore(CURSOR);
+    const rowReq = store.get(row.id);
+    const cursorReq = cursorStore.get(model);
+
+    let existing = null;
+    let currentCursor = 0;
+    let gotRow = false;
+    let gotCursor = false;
+    let applied = row;
+
+    function maybeWrite() {
+      if (!gotRow || !gotCursor) return;
+      applied = mergeServerRow(existing, row);
+      store.put(applied);
+      cursorStore.put(Math.max(currentCursor, cursor), model);
+    }
+
+    rowReq.onsuccess = () => {
+      existing = rowReq.result ?? null;
+      gotRow = true;
+      maybeWrite();
+    };
+    cursorReq.onsuccess = () => {
+      const value = cursorReq.result;
+      currentCursor = typeof value === "number" ? value : 0;
+      gotCursor = true;
+      maybeWrite();
+    };
+    tx.oncomplete = () => resolve(applied);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("transaction aborted"));
+  });
 }
 
 export async function getCursor(db, model) {
-  const tx = db.transaction(CURSOR, 'readonly');
+  const tx = db.transaction(CURSOR, "readonly");
   const v = await reqP(tx.objectStore(CURSOR).get(model));
-  return typeof v === 'number' ? v : 0;
+  return typeof v === "number" ? v : 0;
 }
 
 export async function getAll(db, model) {
-  const tx = db.transaction(model, 'readonly');
+  const tx = db.transaction(model, "readonly");
   return /** @type {any[]} */ (await reqP(tx.objectStore(model).getAll()));
 }
 
 export async function getOne(db, model, id) {
-  const tx = db.transaction(model, 'readonly');
+  const tx = db.transaction(model, "readonly");
   return await reqP(tx.objectStore(model).get(id));
 }
 
 /** @returns {Promise<Array<{seq:number, op:Object}>>} */
 export async function readOutbox(db) {
-  const tx = db.transaction(OUTBOX, 'readonly');
+  const tx = db.transaction(OUTBOX, "readonly");
   return /** @type {any} */ (await reqP(tx.objectStore(OUTBOX).getAll()));
 }
 
 export async function deleteOutboxEntries(db, seqs) {
-  const tx = db.transaction(OUTBOX, 'readwrite');
+  const tx = db.transaction(OUTBOX, "readwrite");
   const store = tx.objectStore(OUTBOX);
   for (const s of seqs) store.delete(s);
   await txDone(tx);
+}
+
+export function mergeServerRow(local, server) {
+  if (!local) return server;
+
+  const serverWriteTs = latestWriteTs(server);
+  const localDeletedAt = local.deletedAt ?? 0;
+  if (localDeletedAt > serverWriteTs) {
+    return withServerMetadata(local, server);
+  }
+
+  if (server.deletedAt) {
+    const localWriteTs = latestWriteTs(local);
+    if (!local.deletedAt && localWriteTs > server.deletedAt) {
+      return mergeLiveRows(local, server);
+    }
+    return server;
+  }
+
+  return mergeLiveRows(local, server);
+}
+
+function mergeLiveRows(local, server) {
+  const data = { ...(server.data ?? {}) };
+  const fieldTs = { ...(server.fieldTs ?? {}) };
+
+  for (const [key, value] of Object.entries(local.data ?? {})) {
+    const localTs = local.fieldTs?.[key] ?? 0;
+    const serverTs = fieldTs[key] ?? 0;
+    if (localTs > serverTs) {
+      data[key] = value;
+      fieldTs[key] = localTs;
+    }
+  }
+
+  return {
+    id: server.id,
+    rev: Math.max(local.rev ?? 0, server.rev ?? 0),
+    serverTs: Math.max(local.serverTs ?? 0, server.serverTs ?? 0),
+    fieldTs,
+    data,
+  };
+}
+
+function withServerMetadata(local, server) {
+  return {
+    ...local,
+    rev: Math.max(local.rev ?? 0, server.rev ?? 0),
+    serverTs: Math.max(local.serverTs ?? 0, server.serverTs ?? 0),
+  };
+}
+
+function latestWriteTs(row) {
+  let latest = row.deletedAt ?? 0;
+  for (const ts of Object.values(row.fieldTs ?? {})) {
+    if (ts > latest) latest = ts;
+  }
+  return latest;
 }

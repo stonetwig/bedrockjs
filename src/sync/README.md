@@ -6,7 +6,7 @@ A lightweight, pluggable data synchronization layer for BedrockJS components. **
 
 - **Offline-first**: All data reads and writes go through IndexedDB; changes queue locally and sync when online
 - **Real-time**: Server-Sent Events (SSE) stream changes to all connected clients in real time
-- **Conflict resolution**: Per-field Last-Writer-Wins (LWW) with server-side timestamps, soft deletes via tombstones
+- **Conflict resolution**: Per-field Last-Writer-Wins (LWW) with monotonic write timestamps, soft deletes via tombstones
 - **Pluggable storage**: Default Deno KV adapter (atomic, built-in) or bring your own (SQLite, etc.)
 - **Multi-tenant ready**: Optional `scope(req)` hook isolates data per user/tenant
 - **Reactive integration**: Works seamlessly with BedrockJS `reactive()` for automatic template updates
@@ -262,16 +262,17 @@ Each scope is completely isolated: `user-1` can never see `user-2`'s data, even 
 
 BedrockJS Sync uses **Last-Writer-Wins** per field:
 
-- Each field value carries its server-side write timestamp (`fieldTs[field]`)
-- When ops arrive out of order, the one with the **newer timestamp wins**
-- Tiebreaker: opId for deterministic resolution
+- Each field value carries the mutation's client-side write timestamp (`fieldTs[field]`)
+- Client write timestamps are monotonic, so rapid same-millisecond local edits still have a stable order
+- When ops arrive out of order, the one with the **newer write timestamp wins**
+- Stale server echoes are merged locally without overwriting newer pending local fields
 - Deletions are soft: tombstone row with `deleted: true` survives until GC
 
 Example:
 
 ```
-Client A: update title to "A" at clientTs=1000 (serverTs=2000)
-Client B: update title to "B" at clientTs=1050 (serverTs=2100)  ← wins (newer serverTs)
+Client A: update title to "A" at clientTs=1000 (serverTs=3000)
+Client A: update title to "B" at clientTs=1001 (serverTs=2000)  ← wins (newer clientTs)
 ```
 
 ## Storage Adapters
